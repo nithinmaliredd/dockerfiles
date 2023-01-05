@@ -1,0 +1,14 @@
+[
+  {
+    "nickname": "$BOT_NICKNAME",
+    "server": "$IRC_SERVER",
+    "token": "$SLACK_TOKEN",
+    "autoSendCommands": [
+        ["MODE", "test", "+i"],
+        ["AUTH", "test", "password"]
+    ],
+    "channelMapping": {
+      "#$SLACK_CHANNEL": "#$IRC_CHANNEL"
+    }
+  }
+]

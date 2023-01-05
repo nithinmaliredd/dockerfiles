@@ -1,0 +1,82 @@
+heat_template_version: 2013-05-23
+
+description:
+  This Heat template creates a single VM to be used for spot testing
+
+parameters:
+  external_network:
+    type: string
+    description: Name of name of the public externally routable network
+    default: routable
+  external_subnet:
+    type: string
+    description: Name of name of the public externally routable subnet
+    default: routable-subnet
+  public_key:
+    type: string
+    description: Public key (e.g. ssh-rsa foo..bar)
+  flavor_name:
+    type: string
+    description: Name of the flavor used to create the instance
+
+resources:
+  shaker_spot:
+    type: OS::Nova::Server
+    properties:
+      name: shaker_spot
+      block_device_mapping: [{"volume_id": { get_resource: resiliency_vol },
+                              "delete_on_termination": true,
+                              "device_name": "vda"}]
+      flavor: { get_param: flavor_name }
+      networks:
+        - port: { get_resource: routable_port_int }
+      key_name: { get_resource: resiliency_key_pair }
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/sh
+            /usr/local/bin/iperf3 -s -p $PORT
+          params:
+            "$PORT": "8080"
+
+  routable_port_int:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: external_network }
+      fixed_ips:
+        - subnet_id: { get_param: external_subnet }
+      security_groups:
+        - { get_resource: port_security_group }
+
+  port_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: shaker-spot-security-group
+      description: Shaker spot security group
+      rules:
+       - remote_ip_prefix: 0.0.0.0/0
+         protocol: tcp
+         port_range_min: 1
+         port_range_max: 65535
+       - remote_ip_prefix: 0.0.0.0/0
+         protocol: udp
+         port_range_min: 1
+         port_range_max: 65535
+       - remote_ip_prefix: 0.0.0.0/0
+         protocol: icmp
+
+  resiliency_vol:
+    type: OS::Cinder::Volume
+    properties:
+      size: 20
+      image: shaker-image
+
+  resiliency_key_pair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: resil_key
+      public_key: { get_param: public_key }
+
+outputs:
+  shaker_spot_ip:
+    value: { get_attr: [ shaker_spot, first_address ] }
